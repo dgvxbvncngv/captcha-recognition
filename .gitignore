@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+env/
+.venv/
+.env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data (generated)
+captcha_system/data/train/
+captcha_system/data/val/
+
+# Model files (large)
+captcha_system/models/*.pth
+!captcha_system/models/.gitkeep
+
+# Database config (contains password)
+captcha_system/src/db_config.py
+
+# Logs
+*.log
+captcha_system/train_progress.log
+captcha_system/test_results.txt
+
+# Uploads / temp
+uploads/
+temp/
+*.tmp
+
+# Flask
+instance/
+.flaskenv
+
+# Debug images
+captcha_system/debug_train_sample.png

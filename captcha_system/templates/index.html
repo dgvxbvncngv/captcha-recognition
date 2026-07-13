@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>验证码识别系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .navbar {
+            background: rgba(255,255,255,0.95);
+            border-radius: 12px;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .nav-brand { font-weight: 700; color: #2d3748; font-size: 18px; }
+        .nav-links { display: flex; gap: 8px; align-items: center; }
+        .nav-links a {
+            color: #4a5568; text-decoration: none; padding: 6px 14px;
+            border-radius: 6px; font-size: 14px; transition: all 0.2s;
+        }
+        .nav-links a:hover { background: #edf2f7; color: #667eea; }
+        .nav-user { color: #718096; font-size: 13px; }
+        .container {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+        h1 { color: #2d3748; font-size: 26px; margin-bottom: 8px; text-align: center; }
+        .subtitle { color: #718096; text-align: center; margin-bottom: 32px; font-size: 14px; }
+        .upload-area {
+            border: 2px dashed #cbd5e0; border-radius: 12px; padding: 40px 20px;
+            text-align: center; cursor: pointer; transition: all 0.3s; background: #f7fafc;
+        }
+        .upload-area:hover, .upload-area.dragover { border-color: #667eea; background: #ebf4ff; }
+        .upload-area svg { width: 56px; height: 56px; fill: #a0aec0; margin-bottom: 12px; }
+        .upload-area p { color: #4a5568; font-size: 15px; }
+        .upload-area .hint { color: #a0aec0; font-size: 12px; margin-top: 6px; }
+        #fileInput { display: none; }
+        .preview { margin-top: 24px; text-align: center; display: none; }
+        .preview img { max-width: 100%; max-height: 120px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f7fafc; padding: 8px; }
+        .btn {
+            display: block; width: 100%; padding: 14px; margin-top: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff; border: none; border-radius: 10px; font-size: 16px;
+            font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(102,126,234,0.4); }
+        .btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+        .result {
+            margin-top: 28px; padding: 20px; background: #f7fafc;
+            border-radius: 10px; border-left: 4px solid #667eea; display: none;
+        }
+        .result-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 15px; }
+        .result-row + .result-row { border-top: 1px solid #e2e8f0; }
+        .result-label { color: #718096; }
+        .result-value { color: #2d3748; font-weight: 600; font-family: "Consolas", monospace; }
+        .result-value.big { font-size: 22px; color: #667eea; letter-spacing: 2px; }
+        .confidence-bar { margin-top: 12px; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .confidence-fill { height: 100%; background: linear-gradient(90deg, #48bb78, #38b2ac); width: 0%; transition: width 0.6s ease; }
+        .status { margin-top: 16px; text-align: center; color: #718096; font-size: 13px; min-height: 18px; }
+        .status.error { color: #e53e3e; }
+        .status.loading::after {
+            content: ''; display: inline-block; width: 12px; height: 12px;
+            border: 2px solid #cbd5e0; border-top-color: #667eea; border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin-left: 8px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .health-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+        .health-dot.ok { background: #48bb78; }
+        .health-dot.err { background: #e53e3e; }
+        .footer { margin-top: 24px; text-align: center; color: #a0aec0; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-brand">验证码识别系统</div>
+        <div class="nav-links">
+            <a href="/">首页</a>
+            {% if user %}
+            <a href="/history">历史记录</a>
+            <a href="/stats">统计分析</a>
+            {% if user.role == 'admin' %}<a href="/logs">系统日志</a>{% endif %}
+            <span class="nav-user">{{ user.username }}（{{ '管理员' if user.role == 'admin' else '用户' }}）</span>
+            <a href="/logout">登出</a>
+            {% else %}
+            <a href="/login">登录</a>
+            <a href="/register">注册</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>验证码识别</h1>
+        <p class="subtitle">
+            <span id="healthDot" class="health-dot err"></span>
+            <span id="healthText">检测服务中...</span>
+        </p>
+
+        <div class="upload-area" id="uploadArea">
+            <svg viewBox="0 0 24 24"><path d="M19 13v6H5v-6H3v8h18v-8zM6 9l1.41 1.41L11 6.83V17h2V6.83l3.59 3.58L18 9l-6-6z"/></svg>
+            <p>点击或拖拽上传验证码图片</p>
+            <p class="hint">支持 PNG / JPG，建议尺寸 160×32</p>
+        </div>
+        <input type="file" id="fileInput" accept="image/*">
+
+        <div class="preview" id="preview">
+            <img id="previewImg" alt="预览">
+        </div>
+
+        <button class="btn" id="predictBtn" disabled>开始识别</button>
+
+        <div class="status" id="status"></div>
+
+        <div class="result" id="result">
+            <div class="result-row">
+                <span class="result-label">识别结果</span>
+                <span class="result-value big" id="predText">-</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">置信度</span>
+                <span class="result-value" id="predConf">-</span>
+            </div>
+            <div class="confidence-bar"><div class="confidence-fill" id="confFill"></div></div>
+        </div>
+
+    </div>
+
+    <script>
+        const API = location.origin;
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const previewImg = document.getElementById('previewImg');
+        const predictBtn = document.getElementById('predictBtn');
+        const statusEl = document.getElementById('status');
+        const result = document.getElementById('result');
+        const predText = document.getElementById('predText');
+        const predConf = document.getElementById('predConf');
+        const confFill = document.getElementById('confFill');
+        const healthDot = document.getElementById('healthDot');
+        const healthText = document.getElementById('healthText');
+        let selectedFile = null;
+
+        async function checkHealth() {
+            try {
+                const r = await fetch(`${API}/health`);
+                const d = await r.json();
+                if (d.status === 'ok') {
+                    healthDot.className = 'health-dot ok';
+                    healthText.textContent = '服务在线';
+                }
+            } catch (e) {
+                healthDot.className = 'health-dot err';
+                healthText.textContent = '服务未连接';
+            }
+        }
+        checkHealth();
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault(); uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) { showStatus('请上传图片文件', 'error'); return; }
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = e => { previewImg.src = e.target.result; preview.style.display = 'block'; };
+            reader.readAsDataURL(file);
+            predictBtn.disabled = false;
+            result.style.display = 'none';
+            showStatus('', '');
+        }
+
+        predictBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            const fd = new FormData();
+            fd.append('image', selectedFile);
+            predictBtn.disabled = true;
+            showStatus('识别中...', 'loading');
+            result.style.display = 'none';
+            try {
+                const r = await fetch(`${API}/predict`, { method: 'POST', body: fd });
+                const d = await r.json();
+                if (r.ok && d.result !== undefined) {
+                    predText.textContent = d.result;
+                    const conf = (d.confidence * 100).toFixed(2);
+                    predConf.textContent = `${conf}%`;
+                    confFill.style.width = `${d.confidence * 100}%`;
+                    result.style.display = 'block';
+                    showStatus('识别完成', '');
+                } else {
+                    showStatus(`错误: ${d.error || '识别失败'}`, 'error');
+                }
+            } catch (e) {
+                showStatus(`请求失败: ${e.message}`, 'error');
+            } finally {
+                predictBtn.disabled = false;
+            }
+        });
+
+        function showStatus(msg, cls) {
+            statusEl.textContent = msg;
+            statusEl.className = 'status' + (cls ? ' ' + cls : '');
+        }
+    </script>
+</body>
+</html>
